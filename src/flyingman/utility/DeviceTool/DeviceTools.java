@@ -4,6 +4,7 @@ package flyingman.utility.DeviceTool;
 import java.text.DecimalFormat;
 import java.util.List;
 
+
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningTaskInfo;
@@ -258,5 +259,7 @@ public class DeviceTools {
 							+ appPackageName)));
 		}
 	}
+	
+	
 
 }
