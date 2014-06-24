@@ -1,23 +1,26 @@
 package flyingman.utility.DeviceTool;
 
-
 import java.text.DecimalFormat;
 import java.util.List;
-
 
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningTaskInfo;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Rect;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Debug;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
+import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 
 public class DeviceTools {
@@ -259,7 +262,263 @@ public class DeviceTools {
 							+ appPackageName)));
 		}
 	}
+
+	/**
+	 * 判斷是否有開啟定位系統
+	 * 
+	 * @param context
+	 *            當下的Context
+	 * 
+	 * @author Jeff
+	 * @date 2014-06-10
+	 */
+	public static boolean isLocationEnable(Context context) {
+		LocationManager lm = null;
+		boolean gps_enabled, network_enabled;
+		boolean enable = false;
+		lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+		try {
+			gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+			network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+			enable = gps_enabled || network_enabled;
+		} catch (Exception ex) {
+		}
+
+		return enable;
+
+	}
+
+	public static interface IOpenLocationSettingDailogOnClick
+	{
+		public void onPositiveClick(DialogInterface dialog, int which);
+		public void onNegativeClick(DialogInterface dialog, int which);
+	}
 	
+	/**
+	 * 開啟設定的定位設定介面
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @param requestCode
+	 *            當以startActivityForResult開啟Setting Activity 
+	 *            可自訂 requestCode值。       
+	 * @param titleId
+	 *            跳出Dialog時的設定title ResourseID。            
+	 * @param msgId
+	 *            跳出Dialog時的設定message ResourseID。            
+	 * @param posTilteId
+	 *            跳出Dialog時的設定正向按鈕的 ResourseID。            
+	 * @param NegTitleId
+	 *            跳出Dialog時的設定負向按鈕的 ResourseID。 
+	 * @author Jeff
+	 * @date 2014-06-12
+	 */
+	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
+			int titleId, int msgId, int posTilteId, int NegTitleId)
+	{
+		String title = null;
+		String msg = null;
+		String posTilte = null;
+		String NegTitle = null;
+		if (titleId != 0)
+			title = activity.getString(titleId);
+
+		if (msgId != 0)
+			msg = activity.getString(msgId);
+
+		if (posTilteId != 0)
+			posTilte = activity.getString(posTilteId);
+
+		if (NegTitleId != 0)
+			NegTitle = activity.getString(NegTitleId);
+		openLocationSettingDailog(
+				activity,
+				requestCode,
+				title,
+				msg,
+				posTilte,
+				NegTitle);
+	}
 	
 
+	/**
+	 * 開啟設定的定位設定介面
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @param requestCode
+	 *            當以startActivityForResult開啟Setting Activity 
+	 *            可自訂 requestCode值。       
+	 * @param titleId
+	 *            跳出Dialog時的設定title ResourseID。            
+	 * @param msgId
+	 *            跳出Dialog時的設定message ResourseID。            
+	 * @param posTilteId
+	 *            跳出Dialog時的設定正向按鈕的 ResourseID。            
+	 * @param NegTitleId
+	 *            跳出Dialog時的設定負向按鈕的 ResourseID。
+	 * @param onClickListener
+	 *           Dialog時的設定正向/負向按鈕的callback函式。
+	 * @author Jeff
+	 * @date 2014-06-12
+	 */
+	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
+			int titleId, int msgId, int posTilteId, int NegTitleId,
+			IOpenLocationSettingDailogOnClick onClickListener)
+	{
+		String title = null;
+		String msg = null;
+		String posTilte = null;
+		String NegTitle = null;
+		if (titleId != 0)
+			title = activity.getString(titleId);
+
+		if (msgId != 0)
+			msg = activity.getString(msgId);
+
+		if (posTilteId != 0)
+			posTilte = activity.getString(posTilteId);
+
+		if (NegTitleId != 0)
+			NegTitle = activity.getString(NegTitleId);
+		openLocationSettingDailog(
+				activity,
+				requestCode,
+				title,
+				msg,
+				posTilte,
+				NegTitle,onClickListener);
+	}
+	
+	/**
+	 * 開啟設定的定位設定介面
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @param requestCode
+	 *            當以startActivityForResult開啟Setting Activity 
+	 *            可自訂 requestCode值。       
+	 * @param title
+	 *            跳出Dialog時的設定title String。            
+	 * @param msg
+	 *            跳出Dialog時的設定message String。            
+	 * @param posTilte
+	 *            跳出Dialog時的設定正向按鈕的 String。            
+	 * @param negTitle
+	 *            跳出Dialog時的設定負向按鈕的 String。
+	 * @author Jeff
+	 * @date 2014-06-12
+	 */
+	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
+			String title, String msg, String posTilte, String negTitle)
+	{
+		openLocationSettingDailog(activity,requestCode,title,msg,posTilte,negTitle,null);
+	}
+
+	/**
+	 * 開啟設定的定位設定介面
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @param requestCode
+	 *            當以startActivityForResult開啟Setting Activity 
+	 *            可自訂 requestCode值。       
+	 * @param title
+	 *            跳出Dialog時的設定title String。            
+	 * @param msg
+	 *            跳出Dialog時的設定message String。            
+	 * @param posTilte
+	 *            跳出Dialog時的設定正向按鈕的 String。            
+	 * @param negTitle
+	 *            跳出Dialog時的設定負向按鈕的 String。
+	 * @param onClickListener
+	 *           Dialog時的設定正向/負向按鈕的callback函式。              
+	 * @author Jeff
+	 * @date 2014-06-12
+	 */
+	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
+			String title, String msg, String posTilte, String negTitle,
+			final IOpenLocationSettingDailogOnClick onClickListener)
+	{
+		AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+		if (title != null)
+			builder.setTitle(title);
+
+		if (msg != null)
+			builder.setMessage(msg);
+
+		if (posTilte != null)
+		{
+
+			builder.setPositiveButton(posTilte, new DialogInterface.OnClickListener()
+			{
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					activity.startActivityForResult(
+							new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+							requestCode);
+
+					if (onClickListener != null)
+						onClickListener.onPositiveClick(dialog, which);
+				}
+			});
+
+		}
+
+		if (negTitle != null)
+		{
+
+			builder.setNegativeButton(negTitle, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					if (onClickListener != null)
+						onClickListener.onNegativeClick(dialog, which);
+				}
+			});
+
+		}
+
+		builder.setCancelable(true);
+
+		AlertDialog alert = builder.create();
+		alert.show();
+	}
+	
+	/**
+	 * 取得狀態Bar的高度
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @author Jeff
+	 * @date 2014-06-18
+	 */	
+	public static int getStatusBarHeight(Activity activity) { 
+	      int result = 0;
+	      if (activity == null)
+	    	  return result;
+	      
+	      int resourceId = activity.getResources().getIdentifier("status_bar_eight", "dimen", "android");
+	      if (resourceId > 0) {
+	          result = activity.getResources().getDimensionPixelSize(resourceId);
+	      } 
+	      return result;
+	} 
+
+	/**
+	 * 取得Action Bar的高度
+	 * 
+	 * @param activity
+	 *            當下的activity
+	 * @author Jeff
+	 * @date 2014-06-18
+	 */	
+	public static int getActionBarHeight(Activity activity)
+	{
+		TypedValue tv = new TypedValue();
+		if (activity!=null && activity.getTheme().resolveAttribute(android.R.attr.actionBarSize, tv, true))
+		    return TypedValue.complexToDimensionPixelSize(tv.data,activity.getResources().getDisplayMetrics());
+		else
+			return 0;
+	}
 }
