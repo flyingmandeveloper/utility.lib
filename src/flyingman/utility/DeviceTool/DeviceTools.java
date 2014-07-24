@@ -14,6 +14,8 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Debug;
 import android.util.DisplayMetrics;
@@ -521,4 +523,37 @@ public class DeviceTools {
 		else
 			return 0;
 	}
+	
+	/**
+	 * 判斷現在是否有連線狀態
+	 * 
+	 * @param context
+	 *            當下的Context
+	 * @author Jeff
+	 * @date 2014-07-24
+	 */	
+	public static boolean hasConnection(Context context) {
+		if (context == null)
+			return false;
+		
+	    ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
+	        Context.CONNECTIVITY_SERVICE);
+
+	    NetworkInfo wifiNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+	    if (wifiNetwork != null && wifiNetwork.isConnected()) {
+	      return true;
+	    }
+
+	    NetworkInfo mobileNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+	    if (mobileNetwork != null && mobileNetwork.isConnected()) {
+	      return true;
+	    }
+
+	    NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+	    if (activeNetwork != null && activeNetwork.isConnected()) {
+	      return true;
+	    }
+
+	    return false;
+	  }
 }
