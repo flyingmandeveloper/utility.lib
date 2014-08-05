@@ -487,6 +487,59 @@ public class DeviceTools {
 		alert.show();
 	}
 	
+    public static interface IDailogOnClick
+    {
+        public void onPositiveClick(DialogInterface dialog, int which);
+        public void onNegativeClick(DialogInterface dialog, int which);
+    }
+ 
+	public static AlertDialog createAlertDialog(final Activity activity, 
+            String title, String msg, String posTilte, String negTitle,
+            final IDailogOnClick onClickListener)
+    {
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        if (title != null)
+            builder.setTitle(title);
+
+        if (msg != null)
+            builder.setMessage(msg);
+
+        if (posTilte != null)
+        {
+
+            builder.setPositiveButton(posTilte, new DialogInterface.OnClickListener()
+            {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (onClickListener != null)
+                        onClickListener.onPositiveClick(dialog, which);
+                }
+            });
+
+        }
+
+        if (negTitle != null)
+        {
+
+            builder.setNegativeButton(negTitle, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (onClickListener != null)
+                        onClickListener.onNegativeClick(dialog, which);
+                }
+            });
+
+        }
+
+        builder.setCancelable(true);
+
+        AlertDialog alert = builder.create();
+        alert.show();
+        
+        return alert;
+    }
+	
+	
 	/**
 	 * 取得狀態Bar的高度
 	 * 
@@ -556,4 +609,48 @@ public class DeviceTools {
 
 	    return false;
 	  }
+	
+	/**
+     * 開啟網頁瀏覽器
+     * 
+     * @param context
+     *            當下的Context
+     * @param url 要開啟的URL 如：　"http://google.com"       
+     * @author Jeff
+     * @date 2014-08-4
+     */ 
+	public static void openWebBrowser(Context context,String url) {
+	    if (context ==null || url == null || (url!=null&&url.contains("http") == false))
+	    {
+	        Log.e("DeviceTool", "openWebBrowser error param");
+	    }
+
+	  Uri uri = Uri.parse(url);  
+	  Intent it = new Intent(Intent.ACTION_VIEW, uri);  
+	  context.startActivity(it);
+	}
+	
+	/**
+     * 開啟撥號程式  
+     * 
+     * @param context
+     *            當下的Context
+     * @param url 要撥打的電話 如：　"0412345678"       
+     * @author Jeff
+     * @date 2014-08-4
+     */ 
+	public static void openPhoneActivity(Context context,String url) {
+        if (context ==null || url == null)
+        {
+            Log.e("DeviceTool", "openPhoneActivity error param");
+        }
+
+        Uri uri = Uri.parse("tel:"+url);  
+        Intent it = new Intent(Intent.ACTION_DIAL, uri);  
+        context.startActivity(it);  
+    }
+
+	 
+
+
 }
