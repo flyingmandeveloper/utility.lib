@@ -12,6 +12,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
@@ -553,7 +555,7 @@ public class DeviceTools {
 	      if (activity == null)
 	    	  return result;
 	      
-	      int resourceId = activity.getResources().getIdentifier("status_bar_eight", "dimen", "android");
+	      int resourceId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
 	      if (resourceId > 0) {
 	          result = activity.getResources().getDimensionPixelSize(resourceId);
 	      } 
@@ -631,7 +633,7 @@ public class DeviceTools {
 	}
 	
 	/**
-     * 開啟撥號程式  
+     * 開啟撥號程式
      * 
      * @param context
      *            當下的Context
@@ -650,7 +652,94 @@ public class DeviceTools {
         context.startActivity(it);  
     }
 
+	/**
+     * 直接撥號程式
+     * 
+     * @param context
+     *            當下的Context
+     * @param url 要撥打的電話 如：　"0412345678"       
+     * @author Jeff
+     * @date 2014-08-4
+     */ 
+    public static void callPhoneActivity(Context context,String url) {
+        if (context ==null || url == null)
+        {
+            Log.e("DeviceTool", "openPhoneActivity error param");
+        }
+
+        Uri uri = Uri.parse("tel:"+url);  
+        Intent it = new Intent(Intent.ACTION_CALL, uri);  
+        context.startActivity(it);  
+    }
+	
+	/**
+     * 開啟email
+     * 
+     * @param context
+     *            當下的Context
+     * @param url 收件人信箱
+     * @param subject 信件標頭
+     * @param body 信件內容      
+     * @author Jeff
+     * @date 2014-08-4
+     */ 
+    public static void openEmailSender(Context context,String url,String subject,String body) {
+        if (context ==null || url == null)
+        {
+            Log.e("DeviceTool", "openEmailSender error param");
+        }
+
+        Intent intent =new Intent(Intent.ACTION_VIEW);
+        Uri data =Uri.parse("mailto:"+url+"?subject="+ subject +"&body="+ body);
+        intent.setData(data);
+        context.startActivity(intent);
+    }
 	 
 
+    /**
+     * 讀取本機圖檔(有縮小圖檔功能)
+     * 
+     * @param picturePath 讀取本機圖檔路徑
+     * @param width 最小圖 寬
+     * @param height 最小圖 高
+     * @author Jeff
+     * @date 2014-08-22
+     */ 
+    
+    public static Bitmap getScaledBitmap(String picturePath, int width, int height) {
+        BitmapFactory.Options sizeOptions = new BitmapFactory.Options();
+        sizeOptions.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(picturePath, sizeOptions);
+     
+        int inSampleSize = calculateInSampleSize(sizeOptions, width, height);
+     
+        sizeOptions.inJustDecodeBounds = false;
+        sizeOptions.inSampleSize = inSampleSize;
+     
+        return BitmapFactory.decodeFile(picturePath, sizeOptions);
+    } 
+     
+    static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image 
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+     
+        if (height > reqHeight || width > reqWidth) {
+     
+            // Calculate ratios of height and width to requested height and 
+            // width 
+            final int heightRatio = Math.round((float) height / (float) reqHeight);
+            final int widthRatio = Math.round((float) width / (float) reqWidth);
+     
+            // Choose the smallest ratio as inSampleSize value, this will 
+            // guarantee 
+            // a final image with both dimensions larger than or equal to the 
+            // requested height and width. 
+            inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+        } 
+     
+        return inSampleSize;
+    } 
 
 }
