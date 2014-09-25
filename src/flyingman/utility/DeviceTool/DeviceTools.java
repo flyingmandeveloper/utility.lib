@@ -3,8 +3,11 @@ package flyingman.utility.DeviceTool;
 import java.text.DecimalFormat;
 import java.util.List;
 
+import android.R.integer;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -14,7 +17,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Rect;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -24,7 +26,6 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
-import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 
 public class DeviceTools {
@@ -741,5 +742,50 @@ public class DeviceTools {
      
         return inSampleSize;
     } 
+    
+    
+    
+    /**
+     * 啟動本機鬧鐘通知
+     * 
+     * @param context 當下的Context
+     * @param intent 通知內容
+     * @param requestCode 自定id，相同id才能取消
+     * @param alarmManagerType 鬧鐘類型
+     * AlarmManager.RTC                 不唤醒手機休眠；當手機休眠時不啟動鬧鐘。
+     * AlarmManager.RTC_WAKEUP          當鬧鐘觸發時將唤醒手機休眠狀態。
+     * AlarmManager.ELAPSED_REALTIME    以計算經過多少時間的方式來觸發鬧鐘，當手機休眠時不啟動鬧鐘。
+     * AlarmManager.ELAPSED_REALTIME_WAKEUP     以計算經過多少時間的方式來觸發鬧鐘，當鬧鐘觸發時將唤醒手機休眠狀態。
+     * RT鬧鐘和ELAPSED_REALTIME 最大的差別是前者是可以修改手機時間來觸發鬧鐘，後者是經過真實時間的流逝，即使在休眠，時間也會被計算。
+     * @param triggerAtMillis 時間
+     * @author Jeff
+     * @date 2014-09-03
+     * 
+     */ 
+    
+    public static void startAlarmManager(Context context,Intent intent,int requestCode,int alarmManagerType,long triggerAtMillis)
+    {
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode,intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.set(alarmManagerType, triggerAtMillis,pendingIntent);
+    }
+    
+    /**
+     * 取消本機鬧鐘通知
+     * 
+     * @param context 當下的Context
+     * @param intent 通知內容
+     * @param requestCode 自定id，相同id才能取消，如果Intent 有設setData / setClass, 則都需要相同才能取消
+     * @author Jeff
+     * @date 2014-09-03
+     * 
+     */ 
+    
+    public static void cancelAlarmManager(Context context,Intent intent,int requestCode)
+    {
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode,intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(pendingIntent);
+    }
 
 }
