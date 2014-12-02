@@ -1,9 +1,18 @@
 package flyingman.utility.DeviceTool;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import android.R.integer;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlarmManager;
@@ -17,11 +26,13 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Debug;
+import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -30,473 +41,474 @@ import android.view.inputmethod.InputMethodManager;
 
 public class DeviceTools {
 
-	public static class ScreenResolution {
-		public int width = 0;
-		public int height = 0;
-		public float widthDP = 0.0f;
-		public float heightDP = 0.0f;
-		public float density = 0.0f;
-	}
+    private static final int DEFAULT_BUFFER_SIZE = 1024 * 4;
+    private static final int EOF = -1;
 
-	/**
-	 * 取得設備螢幕上的解淅
-	 * 
-	 * @param activity
-	 *            當下的Activity
-	 * 
-	 * @return 回傳螢幕的長跟寬，還有密度
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static ScreenResolution getScreenResolution(Activity activity) {
-		if (activity == null)
-			return null;
+    public static class ScreenResolution {
+        public int width = 0;
+        public int height = 0;
+        public float widthDP = 0.0f;
+        public float heightDP = 0.0f;
+        public float density = 0.0f;
+    }
 
-		ScreenResolution sr = new ScreenResolution();
-		Display display = activity.getWindowManager().getDefaultDisplay();
-		DisplayMetrics outMetrics = new DisplayMetrics();
-		display.getMetrics(outMetrics);
-		// display.getWidth() is deprecated
-		// display.getHeight() is deprecated
-		sr.density = activity.getResources().getDisplayMetrics().density;
-		sr.width = outMetrics.widthPixels;
-		sr.height = outMetrics.heightPixels;
-		sr.widthDP = outMetrics.widthPixels / sr.density;
-		sr.heightDP = outMetrics.heightPixels / sr.density;
+    /**
+     * 取得設備螢幕上的解淅
+     * 
+     * @param activity
+     *            當下的Activity
+     * 
+     * @return 回傳螢幕的長跟寬，還有密度
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static ScreenResolution getScreenResolution(Activity activity) {
+        if (activity == null)
+            return null;
 
-		return sr;
-	}
+        ScreenResolution sr = new ScreenResolution();
+        Display display = activity.getWindowManager().getDefaultDisplay();
+        DisplayMetrics outMetrics = new DisplayMetrics();
+        display.getMetrics(outMetrics);
+        // display.getWidth() is deprecated
+        // display.getHeight() is deprecated
+        sr.density = activity.getResources().getDisplayMetrics().density;
+        sr.width = outMetrics.widthPixels;
+        sr.height = outMetrics.heightPixels;
+        sr.widthDP = outMetrics.widthPixels / sr.density;
+        sr.heightDP = outMetrics.heightPixels / sr.density;
 
-	/**
-	 * dp 轉 pixel
-	 * 
-	 * @param context
-	 *            當下的Context
-	 * @param dip
-	 *            要轉成pixel的dip值
-	 * 
-	 * @return 回傳pixel值
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static int getPixelFromDip(Context context, float dip) {
-		if (context == null)
-			return 0;
+        return sr;
+    }
 
-		Resources r = context.getResources();
+    /**
+     * dp 轉 pixel
+     * 
+     * @param context
+     *            當下的Context
+     * @param dip
+     *            要轉成pixel的dip值
+     * 
+     * @return 回傳pixel值
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static int getPixelFromDip(Context context, float dip) {
+        if (context == null)
+            return 0;
 
-		return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
-				dip, r.getDisplayMetrics());
-	}
+        Resources r = context.getResources();
 
-	/**
-	 * pixel 轉 dp
-	 * 
-	 * @param context
-	 *            當下的Context
-	 * @param pixel
-	 *            要轉成dip的pixel值
-	 * 
-	 * @return 回傳dip值
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static float convertDensityPixel(Context context, int pixel) {
-		if (context == null)
-			return 0;
-		Resources r = context.getResources();
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                dip, r.getDisplayMetrics());
+    }
 
-		return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PX, pixel,
-				r.getDisplayMetrics());
-	}
+    /**
+     * pixel 轉 dp
+     * 
+     * @param context
+     *            當下的Context
+     * @param pixel
+     *            要轉成dip的pixel值
+     * 
+     * @return 回傳dip值
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static float convertDensityPixel(Context context, int pixel) {
+        if (context == null)
+            return 0;
+        Resources r = context.getResources();
 
-	/**
-	 * 取得設備目前是 直立 或 橫向
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * 
-	 * @return 回傳dip值
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static int getScreenOrientation(Activity activity) {
-		if (activity == null)
-			return Configuration.ORIENTATION_UNDEFINED;
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PX, pixel,
+                r.getDisplayMetrics());
+    }
 
-		Display getOrient = activity.getWindowManager().getDefaultDisplay();
-		int orientation = Configuration.ORIENTATION_UNDEFINED;
-		if (getOrient.getWidth() == getOrient.getHeight()) {
-			orientation = Configuration.ORIENTATION_SQUARE;
-		} else {
-			if (getOrient.getWidth() < getOrient.getHeight()) {
-				orientation = Configuration.ORIENTATION_PORTRAIT;
-			} else {
-				orientation = Configuration.ORIENTATION_LANDSCAPE;
-			}
-		}
-		return orientation;
-	}
+    /**
+     * 取得設備目前是 直立 或 橫向
+     * 
+     * @param activity
+     *            當下的activity
+     * 
+     * @return 回傳dip值
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static int getScreenOrientation(Activity activity) {
+        if (activity == null)
+            return Configuration.ORIENTATION_UNDEFINED;
 
-	/**
-	 * 取得InputMethodManager
-	 * 
-	 * @return InputMethodManager
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static InputMethodManager getInputMethodManager(Activity activity) {
-		if (activity == null)
-			return null;
-		return (InputMethodManager) activity
-				.getSystemService(Context.INPUT_METHOD_SERVICE);
-	}
+        Display getOrient = activity.getWindowManager().getDefaultDisplay();
+        int orientation = Configuration.ORIENTATION_UNDEFINED;
+        if (getOrient.getWidth() == getOrient.getHeight()) {
+            orientation = Configuration.ORIENTATION_SQUARE;
+        } else {
+            if (getOrient.getWidth() < getOrient.getHeight()) {
+                orientation = Configuration.ORIENTATION_PORTRAIT;
+            } else {
+                orientation = Configuration.ORIENTATION_LANDSCAPE;
+            }
+        }
+        return orientation;
+    }
 
-	/**
-	 * 印記憶體使用量的log
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static void logHeap(String st) {
-		Double allocated = new Double(Debug.getNativeHeapAllocatedSize())
-				/ new Double((1048576));
-		Double available = new Double(Debug.getNativeHeapSize()) / 1048576.0;
-		Double free = new Double(Debug.getNativeHeapFreeSize()) / 1048576.0;
-		DecimalFormat df = new DecimalFormat();
-		df.setMaximumFractionDigits(2);
-		df.setMinimumFractionDigits(2);
+    /**
+     * 取得InputMethodManager
+     * 
+     * @return InputMethodManager
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static InputMethodManager getInputMethodManager(Activity activity) {
+        if (activity == null)
+            return null;
+        return (InputMethodManager) activity
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+    }
 
-		Double totalM = new Double(Runtime.getRuntime().totalMemory())
-				/ new Double((1048576));
-		Double freeM = new Double(Runtime.getRuntime().freeMemory())
-				/ new Double((1048576));
-		Double maxM = new Double(Runtime.getRuntime().maxMemory())
-				/ new Double((1048576));
+    /**
+     * 印記憶體使用量的log
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    @SuppressLint("UseValueOf")
+    public static void logHeap(String st) {
+        Double allocated = new Double(Debug.getNativeHeapAllocatedSize())
+                / new Double((1048576));
+        Double available = new Double(Debug.getNativeHeapSize()) / 1048576.0;
+        Double free = new Double(Debug.getNativeHeapFreeSize()) / 1048576.0;
+        DecimalFormat df = new DecimalFormat();
+        df.setMaximumFractionDigits(2);
+        df.setMinimumFractionDigits(2);
 
-		Log.d("debug", "debug. ===============" + st + "==================");
-		Log.d("debug", "debug.heap native: allocated " + df.format(allocated)
-				+ "MB of " + df.format(available) + "MB (" + df.format(free)
-				+ "MB free)");
-		Log.d("debug",
-				"debug.memory: allocated: " + df.format(totalM) + "/"
-						+ df.format(maxM) + " MB " + " used: "
-						+ df.format(totalM - freeM) + "MB Free: "
-						+ df.format(freeM) + "MB");
-		Log.d("debug", "total: " + (allocated + (totalM - freeM)));
+        Double totalM = new Double(Runtime.getRuntime().totalMemory())
+                / new Double((1048576));
+        Double freeM = new Double(Runtime.getRuntime().freeMemory())
+                / new Double((1048576));
+        Double maxM = new Double(Runtime.getRuntime().maxMemory())
+                / new Double((1048576));
 
-	}
+        Log.d("debug", "debug. ===============" + st + "==================");
+        Log.d("debug", "debug.heap native: allocated " + df.format(allocated)
+                + "MB of " + df.format(available) + "MB (" + df.format(free)
+                + "MB free)");
+        Log.d("debug",
+                "debug.memory: allocated: " + df.format(totalM) + "/"
+                        + df.format(maxM) + " MB " + " used: "
+                        + df.format(totalM - freeM) + "MB Free: "
+                        + df.format(freeM) + "MB");
+        Log.d("debug", "total: " + (allocated + (totalM - freeM)));
 
-	/**
-	 * 取得Activity是否正在執行中
-	 * 
-	 * @param ctx
-	 *            當下的Context
-	 * 
-	 * @return boolean 是/否 正在執行中
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static boolean isActivityRunning(Context ctx) {
-		ActivityManager activityManager = (ActivityManager) ctx
-				.getSystemService(Context.ACTIVITY_SERVICE);
-		List<RunningTaskInfo> tasks = activityManager
-				.getRunningTasks(Integer.MAX_VALUE);
+    }
 
-		for (RunningTaskInfo task : tasks) {
-			if (ctx.getPackageName().equalsIgnoreCase(
-					task.baseActivity.getPackageName()))
-				return true;
-		}
+    /**
+     * 取得Activity是否正在執行中
+     * 
+     * @param ctx
+     *            當下的Context
+     * 
+     * @return boolean 是/否 正在執行中
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static boolean isActivityRunning(Context ctx) {
+        ActivityManager activityManager = (ActivityManager) ctx
+                .getSystemService(Context.ACTIVITY_SERVICE);
+        List<RunningTaskInfo> tasks = activityManager
+                .getRunningTasks(Integer.MAX_VALUE);
 
-		return false;
-	}
+        for (RunningTaskInfo task : tasks) {
+            if (ctx.getPackageName().equalsIgnoreCase(
+                    task.baseActivity.getPackageName()))
+                return true;
+        }
 
-	/**
-	 * 取得Activity是否正在執行中
-	 * 
-	 * @param ctx
-	 *            當下的Context
-	 * @param activityClass
-	 *            要檢查的Activity
-	 * 
-	 * @return boolean 是/否 正在執行中
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static boolean isActivityRunning(Context ctx, Class activityClass) {
-		ActivityManager activityManager = (ActivityManager) ctx
-				.getSystemService(Context.ACTIVITY_SERVICE);
-		List<ActivityManager.RunningTaskInfo> tasks = activityManager
-				.getRunningTasks(Integer.MAX_VALUE);
+        return false;
+    }
 
-		for (ActivityManager.RunningTaskInfo task : tasks) {
-			if (activityClass.getCanonicalName().equalsIgnoreCase(
-					task.baseActivity.getClassName()))
-				return true;
-		}
+    /**
+     * 取得Activity是否正在執行中
+     * 
+     * @param ctx
+     *            當下的Context
+     * @param activityClass
+     *            要檢查的Activity
+     * 
+     * @return boolean 是/否 正在執行中
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static boolean isActivityRunning(Context ctx, Class activityClass) {
+        ActivityManager activityManager = (ActivityManager) ctx
+                .getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningTaskInfo> tasks = activityManager
+                .getRunningTasks(Integer.MAX_VALUE);
 
-		return false;
-	}
+        for (ActivityManager.RunningTaskInfo task : tasks) {
+            if (activityClass.getCanonicalName().equalsIgnoreCase(
+                    task.baseActivity.getClassName()))
+                return true;
+        }
 
-	/**
-	 * 在google play商城上開啟App的下載頁面
-	 * 
-	 * @param ctx
-	 *            當下的Context
-	 * @param appPackageName
-	 *            App的package名稱
-	 * 
-	 * @author Jeff
-	 * @date 2014-5-22
-	 */
-	public static void openAppAtGooglePlay(Context ctx, String appPackageName) {
-		try {
-			ctx.startActivity(new Intent(Intent.ACTION_VIEW, Uri
-					.parse("market://details?id=" + appPackageName)));
-		} catch (android.content.ActivityNotFoundException anfe) {
-			ctx.startActivity(new Intent(Intent.ACTION_VIEW, Uri
-					.parse("http://play.google.com/store/apps/details?id="
-							+ appPackageName)));
-		}
-	}
+        return false;
+    }
 
-	/**
-	 * 判斷是否有開啟定位系統
-	 * 
-	 * @param context
-	 *            當下的Context
-	 * 
-	 * @author Jeff
-	 * @date 2014-06-10
-	 */
-	public static boolean isLocationEnable(Context context) {
-		LocationManager lm = null;
-		boolean gps_enabled, network_enabled;
-		boolean enable = false;
-		lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-		try {
-			gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
-			network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    /**
+     * 在google play商城上開啟App的下載頁面
+     * 
+     * @param ctx
+     *            當下的Context
+     * @param appPackageName
+     *            App的package名稱
+     * 
+     * @author Jeff
+     * @date 2014-5-22
+     */
+    public static void openAppAtGooglePlay(Context ctx, String appPackageName) {
+        try {
+            ctx.startActivity(new Intent(Intent.ACTION_VIEW, Uri
+                    .parse("market://details?id=" + appPackageName)));
+        } catch (android.content.ActivityNotFoundException anfe) {
+            ctx.startActivity(new Intent(Intent.ACTION_VIEW, Uri
+                    .parse("http://play.google.com/store/apps/details?id="
+                            + appPackageName)));
+        }
+    }
 
-			enable = gps_enabled || network_enabled;
-		} catch (Exception ex) {
-		}
+    /**
+     * 判斷是否有開啟定位系統
+     * 
+     * @param context
+     *            當下的Context
+     * 
+     * @author Jeff
+     * @date 2014-06-10
+     */
+    public static boolean isLocationEnable(Context context) {
+        LocationManager lm = null;
+        boolean gps_enabled, network_enabled;
+        boolean enable = false;
+        lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        try {
+            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
-		return enable;
+            enable = gps_enabled || network_enabled;
+        } catch (Exception ex) {
+        }
 
-	}
+        return enable;
 
-	public static interface IOpenLocationSettingDailogOnClick
-	{
-		public void onPositiveClick(DialogInterface dialog, int which);
-		public void onNegativeClick(DialogInterface dialog, int which);
-	}
-	
-	/**
-	 * 開啟設定的定位設定介面
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @param requestCode
-	 *            當以startActivityForResult開啟Setting Activity 
-	 *            可自訂 requestCode值。       
-	 * @param titleId
-	 *            跳出Dialog時的設定title ResourseID。            
-	 * @param msgId
-	 *            跳出Dialog時的設定message ResourseID。            
-	 * @param posTilteId
-	 *            跳出Dialog時的設定正向按鈕的 ResourseID。            
-	 * @param NegTitleId
-	 *            跳出Dialog時的設定負向按鈕的 ResourseID。 
-	 * @author Jeff
-	 * @date 2014-06-12
-	 */
-	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
-			int titleId, int msgId, int posTilteId, int NegTitleId)
-	{
-		String title = null;
-		String msg = null;
-		String posTilte = null;
-		String NegTitle = null;
-		if (titleId != 0)
-			title = activity.getString(titleId);
+    }
 
-		if (msgId != 0)
-			msg = activity.getString(msgId);
+    public static interface IOpenLocationSettingDailogOnClick
+    {
+        public void onPositiveClick(DialogInterface dialog, int which);
 
-		if (posTilteId != 0)
-			posTilte = activity.getString(posTilteId);
+        public void onNegativeClick(DialogInterface dialog, int which);
+    }
 
-		if (NegTitleId != 0)
-			NegTitle = activity.getString(NegTitleId);
-		openLocationSettingDailog(
-				activity,
-				requestCode,
-				title,
-				msg,
-				posTilte,
-				NegTitle);
-	}
-	
+    /**
+     * 開啟設定的定位設定介面
+     * 
+     * @param activity
+     *            當下的activity
+     * @param requestCode
+     *            當以startActivityForResult開啟Setting Activity 可自訂 requestCode值。
+     * @param titleId
+     *            跳出Dialog時的設定title ResourseID。
+     * @param msgId
+     *            跳出Dialog時的設定message ResourseID。
+     * @param posTilteId
+     *            跳出Dialog時的設定正向按鈕的 ResourseID。
+     * @param NegTitleId
+     *            跳出Dialog時的設定負向按鈕的 ResourseID。
+     * @author Jeff
+     * @date 2014-06-12
+     */
+    public static void openLocationSettingDailog(final Activity activity, final int requestCode,
+            int titleId, int msgId, int posTilteId, int NegTitleId)
+    {
+        String title = null;
+        String msg = null;
+        String posTilte = null;
+        String NegTitle = null;
+        if (titleId != 0)
+            title = activity.getString(titleId);
 
-	/**
-	 * 開啟設定的定位設定介面
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @param requestCode
-	 *            當以startActivityForResult開啟Setting Activity 
-	 *            可自訂 requestCode值。       
-	 * @param titleId
-	 *            跳出Dialog時的設定title ResourseID。            
-	 * @param msgId
-	 *            跳出Dialog時的設定message ResourseID。            
-	 * @param posTilteId
-	 *            跳出Dialog時的設定正向按鈕的 ResourseID。            
-	 * @param NegTitleId
-	 *            跳出Dialog時的設定負向按鈕的 ResourseID。
-	 * @param onClickListener
-	 *           Dialog時的設定正向/負向按鈕的callback函式。
-	 * @author Jeff
-	 * @date 2014-06-12
-	 */
-	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
-			int titleId, int msgId, int posTilteId, int NegTitleId,
-			IOpenLocationSettingDailogOnClick onClickListener)
-	{
-		String title = null;
-		String msg = null;
-		String posTilte = null;
-		String NegTitle = null;
-		if (titleId != 0)
-			title = activity.getString(titleId);
+        if (msgId != 0)
+            msg = activity.getString(msgId);
 
-		if (msgId != 0)
-			msg = activity.getString(msgId);
+        if (posTilteId != 0)
+            posTilte = activity.getString(posTilteId);
 
-		if (posTilteId != 0)
-			posTilte = activity.getString(posTilteId);
+        if (NegTitleId != 0)
+            NegTitle = activity.getString(NegTitleId);
+        openLocationSettingDailog(
+                activity,
+                requestCode,
+                title,
+                msg,
+                posTilte,
+                NegTitle);
+    }
 
-		if (NegTitleId != 0)
-			NegTitle = activity.getString(NegTitleId);
-		openLocationSettingDailog(
-				activity,
-				requestCode,
-				title,
-				msg,
-				posTilte,
-				NegTitle,onClickListener);
-	}
-	
-	/**
-	 * 開啟設定的定位設定介面
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @param requestCode
-	 *            當以startActivityForResult開啟Setting Activity 
-	 *            可自訂 requestCode值。       
-	 * @param title
-	 *            跳出Dialog時的設定title String。            
-	 * @param msg
-	 *            跳出Dialog時的設定message String。            
-	 * @param posTilte
-	 *            跳出Dialog時的設定正向按鈕的 String。            
-	 * @param negTitle
-	 *            跳出Dialog時的設定負向按鈕的 String。
-	 * @author Jeff
-	 * @date 2014-06-12
-	 */
-	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
-			String title, String msg, String posTilte, String negTitle)
-	{
-		openLocationSettingDailog(activity,requestCode,title,msg,posTilte,negTitle,null);
-	}
+    /**
+     * 開啟設定的定位設定介面
+     * 
+     * @param activity
+     *            當下的activity
+     * @param requestCode
+     *            當以startActivityForResult開啟Setting Activity 可自訂 requestCode值。
+     * @param titleId
+     *            跳出Dialog時的設定title ResourseID。
+     * @param msgId
+     *            跳出Dialog時的設定message ResourseID。
+     * @param posTilteId
+     *            跳出Dialog時的設定正向按鈕的 ResourseID。
+     * @param NegTitleId
+     *            跳出Dialog時的設定負向按鈕的 ResourseID。
+     * @param onClickListener
+     *            Dialog時的設定正向/負向按鈕的callback函式。
+     * @author Jeff
+     * @date 2014-06-12
+     */
+    public static void openLocationSettingDailog(final Activity activity, final int requestCode,
+            int titleId, int msgId, int posTilteId, int NegTitleId,
+            IOpenLocationSettingDailogOnClick onClickListener)
+    {
+        String title = null;
+        String msg = null;
+        String posTilte = null;
+        String NegTitle = null;
+        if (titleId != 0)
+            title = activity.getString(titleId);
 
-	/**
-	 * 開啟設定的定位設定介面
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @param requestCode
-	 *            當以startActivityForResult開啟Setting Activity 
-	 *            可自訂 requestCode值。       
-	 * @param title
-	 *            跳出Dialog時的設定title String。            
-	 * @param msg
-	 *            跳出Dialog時的設定message String。            
-	 * @param posTilte
-	 *            跳出Dialog時的設定正向按鈕的 String。            
-	 * @param negTitle
-	 *            跳出Dialog時的設定負向按鈕的 String。
-	 * @param onClickListener
-	 *           Dialog時的設定正向/負向按鈕的callback函式。              
-	 * @author Jeff
-	 * @date 2014-06-12
-	 */
-	public static void openLocationSettingDailog(final Activity activity,final int requestCode, 
-			String title, String msg, String posTilte, String negTitle,
-			final IOpenLocationSettingDailogOnClick onClickListener)
-	{
-		AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-		if (title != null)
-			builder.setTitle(title);
+        if (msgId != 0)
+            msg = activity.getString(msgId);
 
-		if (msg != null)
-			builder.setMessage(msg);
+        if (posTilteId != 0)
+            posTilte = activity.getString(posTilteId);
 
-		if (posTilte != null)
-		{
+        if (NegTitleId != 0)
+            NegTitle = activity.getString(NegTitleId);
+        openLocationSettingDailog(
+                activity,
+                requestCode,
+                title,
+                msg,
+                posTilte,
+                NegTitle, onClickListener);
+    }
 
-			builder.setPositiveButton(posTilte, new DialogInterface.OnClickListener()
-			{
-				@Override
-				public void onClick(DialogInterface dialog, int which) {
-					activity.startActivityForResult(
-							new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS),
-							requestCode);
+    /**
+     * 開啟設定的定位設定介面
+     * 
+     * @param activity
+     *            當下的activity
+     * @param requestCode
+     *            當以startActivityForResult開啟Setting Activity 可自訂 requestCode值。
+     * @param title
+     *            跳出Dialog時的設定title String。
+     * @param msg
+     *            跳出Dialog時的設定message String。
+     * @param posTilte
+     *            跳出Dialog時的設定正向按鈕的 String。
+     * @param negTitle
+     *            跳出Dialog時的設定負向按鈕的 String。
+     * @author Jeff
+     * @date 2014-06-12
+     */
+    public static void openLocationSettingDailog(final Activity activity, final int requestCode,
+            String title, String msg, String posTilte, String negTitle)
+    {
+        openLocationSettingDailog(activity, requestCode, title, msg, posTilte, negTitle, null);
+    }
 
-					if (onClickListener != null)
-						onClickListener.onPositiveClick(dialog, which);
-				}
-			});
+    /**
+     * 開啟設定的定位設定介面
+     * 
+     * @param activity
+     *            當下的activity
+     * @param requestCode
+     *            當以startActivityForResult開啟Setting Activity 可自訂 requestCode值。
+     * @param title
+     *            跳出Dialog時的設定title String。
+     * @param msg
+     *            跳出Dialog時的設定message String。
+     * @param posTilte
+     *            跳出Dialog時的設定正向按鈕的 String。
+     * @param negTitle
+     *            跳出Dialog時的設定負向按鈕的 String。
+     * @param onClickListener
+     *            Dialog時的設定正向/負向按鈕的callback函式。
+     * @author Jeff
+     * @date 2014-06-12
+     */
+    public static void openLocationSettingDailog(final Activity activity, final int requestCode,
+            String title, String msg, String posTilte, String negTitle,
+            final IOpenLocationSettingDailogOnClick onClickListener)
+    {
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        if (title != null)
+            builder.setTitle(title);
 
-		}
+        if (msg != null)
+            builder.setMessage(msg);
 
-		if (negTitle != null)
-		{
+        if (posTilte != null)
+        {
 
-			builder.setNegativeButton(negTitle, new DialogInterface.OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog, int which) {
-					if (onClickListener != null)
-						onClickListener.onNegativeClick(dialog, which);
-				}
-			});
+            builder.setPositiveButton(posTilte, new DialogInterface.OnClickListener()
+            {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    activity.startActivityForResult(
+                            new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                            requestCode);
 
-		}
+                    if (onClickListener != null)
+                        onClickListener.onPositiveClick(dialog, which);
+                }
+            });
 
-		builder.setCancelable(true);
+        }
 
-		AlertDialog alert = builder.create();
-		alert.show();
-	}
-	
+        if (negTitle != null)
+        {
+
+            builder.setNegativeButton(negTitle, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (onClickListener != null)
+                        onClickListener.onNegativeClick(dialog, which);
+                }
+            });
+
+        }
+
+        builder.setCancelable(true);
+
+        AlertDialog alert = builder.create();
+        alert.show();
+    }
+
     public static interface IDailogOnClick
     {
         public void onPositiveClick(DialogInterface dialog, int which);
+
         public void onNegativeClick(DialogInterface dialog, int which);
     }
- 
-	public static AlertDialog createAlertDialog(final Activity activity, 
+
+    public static AlertDialog createAlertDialog(final Activity activity,
             String title, String msg, String posTilte, String negTitle,
             final IDailogOnClick onClickListener)
     {
@@ -538,254 +550,447 @@ public class DeviceTools {
 
         AlertDialog alert = builder.create();
         alert.show();
-        
+
         return alert;
     }
-	
-	
-	/**
-	 * 取得狀態Bar的高度
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @author Jeff
-	 * @date 2014-06-18
-	 */	
-	public static int getStatusBarHeight(Activity activity) { 
-	      int result = 0;
-	      if (activity == null)
-	    	  return result;
-	      
-	      int resourceId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
-	      if (resourceId > 0) {
-	          result = activity.getResources().getDimensionPixelSize(resourceId);
-	      } 
-	      return result;
-	} 
 
-	/**
-	 * 取得Action Bar的高度
-	 * 
-	 * @param activity
-	 *            當下的activity
-	 * @author Jeff
-	 * @date 2014-06-18
-	 */	
-	public static int getActionBarHeight(Activity activity)
-	{
-		TypedValue tv = new TypedValue();
-		if (activity!=null && activity.getTheme().resolveAttribute(android.R.attr.actionBarSize, tv, true))
-		    return TypedValue.complexToDimensionPixelSize(tv.data,activity.getResources().getDisplayMetrics());
-		else
-			return 0;
-	}
-	
-	/**
-	 * 判斷現在是否有連線狀態
-	 * 
-	 * @param context
-	 *            當下的Context
-	 * @author Jeff
-	 * @date 2014-07-24
-	 */	
-	public static boolean hasConnection(Context context) {
-		if (context == null)
-			return false;
-		
-	    ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
-	        Context.CONNECTIVITY_SERVICE);
+    /**
+     * 取得狀態Bar的高度
+     * 
+     * @param activity
+     *            當下的activity
+     * @author Jeff
+     * @date 2014-06-18
+     */
+    public static int getStatusBarHeight(Activity activity) {
+        int result = 0;
+        if (activity == null)
+            return result;
 
-	    NetworkInfo wifiNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-	    if (wifiNetwork != null && wifiNetwork.isConnected()) {
-	      return true;
-	    }
+        int resourceId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = activity.getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
 
-	    NetworkInfo mobileNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-	    if (mobileNetwork != null && mobileNetwork.isConnected()) {
-	      return true;
-	    }
+    /**
+     * 取得Action Bar的高度
+     * 
+     * @param activity
+     *            當下的activity
+     * @author Jeff
+     * @date 2014-06-18
+     */
+    public static int getActionBarHeight(Activity activity)
+    {
+        TypedValue tv = new TypedValue();
+        if (activity != null && activity.getTheme().resolveAttribute(android.R.attr.actionBarSize, tv, true))
+            return TypedValue.complexToDimensionPixelSize(tv.data, activity.getResources().getDisplayMetrics());
+        else
+            return 0;
+    }
 
-	    NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-	    if (activeNetwork != null && activeNetwork.isConnected()) {
-	      return true;
-	    }
+    /**
+     * 判斷現在是否有連線狀態
+     * 
+     * @param context
+     *            當下的Context
+     * @author Jeff
+     * @date 2014-07-24
+     */
+    public static boolean hasConnection(Context context) {
+        if (context == null)
+            return false;
 
-	    return false;
-	  }
-	
-	/**
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+
+        NetworkInfo wifiNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        if (wifiNetwork != null && wifiNetwork.isConnected()) {
+            return true;
+        }
+
+        NetworkInfo mobileNetwork = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+        if (mobileNetwork != null && mobileNetwork.isConnected()) {
+            return true;
+        }
+
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        if (activeNetwork != null && activeNetwork.isConnected()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * 開啟網頁瀏覽器
      * 
      * @param context
      *            當下的Context
-     * @param url 要開啟的URL 如：　"http://google.com"       
+     * @param url
+     *            要開啟的URL 如：　"http://google.com"
      * @author Jeff
      * @date 2014-08-4
-     */ 
-	public static void openWebBrowser(Context context,String url) {
-	    if (context ==null || url == null || (url!=null&&url.contains("http") == false))
-	    {
-	        Log.e("DeviceTool", "openWebBrowser error param");
-	    }
+     */
+    public static void openWebBrowser(Context context, String url) {
+        if (context == null || url == null || (url != null && url.contains("http") == false))
+        {
+            Log.e("DeviceTool", "openWebBrowser error param");
+        }
 
-	  Uri uri = Uri.parse(url);  
-	  Intent it = new Intent(Intent.ACTION_VIEW, uri);  
-	  context.startActivity(it);
-	}
-	
-	/**
+        Uri uri = Uri.parse(url);
+        Intent it = new Intent(Intent.ACTION_VIEW, uri);
+        context.startActivity(it);
+    }
+
+    /**
      * 開啟撥號程式
      * 
      * @param context
      *            當下的Context
-     * @param url 要撥打的電話 如：　"0412345678"       
+     * @param url
+     *            要撥打的電話 如：　"0412345678"
      * @author Jeff
      * @date 2014-08-4
-     */ 
-	public static void openPhoneActivity(Context context,String url) {
-        if (context ==null || url == null)
+     */
+    public static void openPhoneActivity(Context context, String url) {
+        if (context == null || url == null)
         {
             Log.e("DeviceTool", "openPhoneActivity error param");
         }
 
-        Uri uri = Uri.parse("tel:"+url);  
-        Intent it = new Intent(Intent.ACTION_DIAL, uri);  
-        context.startActivity(it);  
+        Uri uri = Uri.parse("tel:" + url);
+        Intent it = new Intent(Intent.ACTION_DIAL, uri);
+        context.startActivity(it);
     }
 
-	/**
+    /**
      * 直接撥號程式
      * 
      * @param context
      *            當下的Context
-     * @param url 要撥打的電話 如：　"0412345678"       
+     * @param url
+     *            要撥打的電話 如：　"0412345678"
      * @author Jeff
      * @date 2014-08-4
-     */ 
-    public static void callPhoneActivity(Context context,String url) {
-        if (context ==null || url == null)
+     */
+    public static void callPhoneActivity(Context context, String url) {
+        if (context == null || url == null)
         {
             Log.e("DeviceTool", "openPhoneActivity error param");
         }
 
-        Uri uri = Uri.parse("tel:"+url);  
-        Intent it = new Intent(Intent.ACTION_CALL, uri);  
-        context.startActivity(it);  
+        Uri uri = Uri.parse("tel:" + url);
+        Intent it = new Intent(Intent.ACTION_CALL, uri);
+        context.startActivity(it);
     }
-	
-	/**
+
+    /**
      * 開啟email
      * 
      * @param context
      *            當下的Context
-     * @param url 收件人信箱
-     * @param subject 信件標頭
-     * @param body 信件內容      
+     * @param url
+     *            收件人信箱
+     * @param subject
+     *            信件標頭
+     * @param body
+     *            信件內容
      * @author Jeff
      * @date 2014-08-4
-     */ 
-    public static void openEmailSender(Context context,String url,String subject,String body) {
-        if (context ==null || url == null)
+     */
+    public static void openEmailSender(Context context, String url, String subject, String body) {
+        if (context == null || url == null)
         {
             Log.e("DeviceTool", "openEmailSender error param");
         }
 
-        Intent intent =new Intent(Intent.ACTION_VIEW);
-        Uri data =Uri.parse("mailto:"+url+"?subject="+ subject +"&body="+ body);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        Uri data = Uri.parse("mailto:" + url + "?subject=" + subject + "&body=" + body);
         intent.setData(data);
         context.startActivity(intent);
     }
-	 
 
     /**
      * 讀取本機圖檔(有縮小圖檔功能)
      * 
-     * @param picturePath 讀取本機圖檔路徑
-     * @param width 最小圖 寬
-     * @param height 最小圖 高
+     * @param picturePath
+     *            讀取本機圖檔路徑
+     * @param width
+     *            最小圖 寬
+     * @param height
+     *            最小圖 高
      * @author Jeff
      * @date 2014-08-22
-     */ 
-    
+     */
+
     public static Bitmap getScaledBitmap(String picturePath, int width, int height) {
         BitmapFactory.Options sizeOptions = new BitmapFactory.Options();
         sizeOptions.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(picturePath, sizeOptions);
-     
+
         int inSampleSize = calculateInSampleSize(sizeOptions, width, height);
-     
+
         sizeOptions.inJustDecodeBounds = false;
         sizeOptions.inSampleSize = inSampleSize;
-     
+
         return BitmapFactory.decodeFile(picturePath, sizeOptions);
-    } 
-     
+    }
+
     static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
-        // Raw height and width of image 
+        // Raw height and width of image
         final int height = options.outHeight;
         final int width = options.outWidth;
         int inSampleSize = 1;
-     
+
         if (height > reqHeight || width > reqWidth) {
-     
-            // Calculate ratios of height and width to requested height and 
-            // width 
+
+            // Calculate ratios of height and width to requested height and
+            // width
             final int heightRatio = Math.round((float) height / (float) reqHeight);
             final int widthRatio = Math.round((float) width / (float) reqWidth);
-     
-            // Choose the smallest ratio as inSampleSize value, this will 
-            // guarantee 
-            // a final image with both dimensions larger than or equal to the 
-            // requested height and width. 
+
+            // Choose the smallest ratio as inSampleSize value, this will
+            // guarantee
+            // a final image with both dimensions larger than or equal to the
+            // requested height and width.
             inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
-        } 
-     
+        }
+
         return inSampleSize;
-    } 
-    
-    
-    
+    }
+
     /**
      * 啟動本機鬧鐘通知
      * 
-     * @param context 當下的Context
-     * @param intent 通知內容
-     * @param requestCode 自定id，相同id才能取消
-     * @param alarmManagerType 鬧鐘類型
-     * AlarmManager.RTC                 不唤醒手機休眠；當手機休眠時不啟動鬧鐘。
-     * AlarmManager.RTC_WAKEUP          當鬧鐘觸發時將唤醒手機休眠狀態。
-     * AlarmManager.ELAPSED_REALTIME    以計算經過多少時間的方式來觸發鬧鐘，當手機休眠時不啟動鬧鐘。
-     * AlarmManager.ELAPSED_REALTIME_WAKEUP     以計算經過多少時間的方式來觸發鬧鐘，當鬧鐘觸發時將唤醒手機休眠狀態。
-     * RT鬧鐘和ELAPSED_REALTIME 最大的差別是前者是可以修改手機時間來觸發鬧鐘，後者是經過真實時間的流逝，即使在休眠，時間也會被計算。
-     * @param triggerAtMillis 時間
+     * @param context
+     *            當下的Context
+     * @param intent
+     *            通知內容
+     * @param requestCode
+     *            自定id，相同id才能取消
+     * @param alarmManagerType
+     *            鬧鐘類型 AlarmManager.RTC 不唤醒手機休眠；當手機休眠時不啟動鬧鐘。
+     *            AlarmManager.RTC_WAKEUP 當鬧鐘觸發時將唤醒手機休眠狀態。
+     *            AlarmManager.ELAPSED_REALTIME 以計算經過多少時間的方式來觸發鬧鐘，當手機休眠時不啟動鬧鐘。
+     *            AlarmManager.ELAPSED_REALTIME_WAKEUP
+     *            以計算經過多少時間的方式來觸發鬧鐘，當鬧鐘觸發時將唤醒手機休眠狀態。 RT鬧鐘和ELAPSED_REALTIME
+     *            最大的差別是前者是可以修改手機時間來觸發鬧鐘，後者是經過真實時間的流逝，即使在休眠，時間也會被計算。
+     * @param triggerAtMillis
+     *            時間
      * @author Jeff
      * @date 2014-09-03
      * 
-     */ 
-    
-    public static void startAlarmManager(Context context,Intent intent,int requestCode,int alarmManagerType,long triggerAtMillis)
+     */
+
+    public static void startAlarmManager(Context context, Intent intent, int requestCode, int alarmManagerType, long triggerAtMillis)
     {
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode,intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.set(alarmManagerType, triggerAtMillis,pendingIntent);
+        alarmManager.set(alarmManagerType, triggerAtMillis, pendingIntent);
     }
-    
+
     /**
      * 取消本機鬧鐘通知
      * 
-     * @param context 當下的Context
-     * @param intent 通知內容
-     * @param requestCode 自定id，相同id才能取消，如果Intent 有設setData / setClass, 則都需要相同才能取消
+     * @param context
+     *            當下的Context
+     * @param intent
+     *            通知內容
+     * @param requestCode
+     *            自定id，相同id才能取消，如果Intent 有設setData / setClass, 則都需要相同才能取消
      * @author Jeff
      * @date 2014-09-03
      * 
-     */ 
-    
-    public static void cancelAlarmManager(Context context,Intent intent,int requestCode)
+     */
+
+    public static void cancelAlarmManager(Context context, Intent intent, int requestCode)
     {
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode,intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(pendingIntent);
     }
+
+    /**
+     * 判斷是否為電話號碼
+     * 
+     * @param phoneNo
+     *            電話號碼
+     * @author Jeremy
+     * @date 2014-10-03
+     * 
+     */
+    public static boolean isPhoneValid(String phoneNo) {
+        String expression = "^[0-9-+]{9,15}$";
+        CharSequence inputStr = phoneNo;
+        Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(inputStr);
+
+        return (matcher.matches()) ? true : false;
+    }
+
+    /**
+     * AES編碼
+     * 
+     * @param key
+     *            編碼蜜鑰
+     * @param raw
+     *            編碼前的字串
+     * @return 編碼後的字串
+     * @throws Exception
+     */
+    @SuppressLint("TrulyRandom")
+    public static String encrypt(String key, String raw) throws Exception {
+        SecretKeySpec skeySpec = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
+        byte[] encrypted = cipher.doFinal(raw.getBytes());
+        return Base64.encodeToString(encrypted, Base64.DEFAULT);
+    }
+
+    /**
+     * AES解碼
+     * 
+     * @param key
+     *            解碼蜜鑰
+     * @param raw
+     *            解碼前的字串
+     * @return 解碼後的字串
+     * @throws Exception
+     */
+    public static String decrypt(String key, String raw) throws Exception {
+        byte[] data = Base64.decode(raw, Base64.DEFAULT);
+        SecretKeySpec skeySpec = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+        byte[] decrypted = cipher.doFinal(data);
+        return new String(decrypted, "UTF-8");
+    }
+
+    /**
+     * Hex string to byte array
+     * 
+     * @param s
+     * @return
+     */
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+
+        byte[] data = new byte[len / 2];
+
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
+        }
+
+        return data;
+    }
+
+    final protected static char[] hexArray = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+    /**
+     * Byte array to Hex string
+     * 
+     * @param bytes
+     * @return
+     */
+    public static String byteArrayToHexString(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        int v;
+
+        for (int j = 0; j < bytes.length; j++) {
+            v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+
+        return new String(hexChars);
+    }
+
+    /**
+     * Byte to Hex string
+     * 
+     * @param b
+     * @return
+     */
+    public static String byteToHexString(byte b) {
+        char[] hexChars = new char[2];
+
+        int v = b & 0xFF;
+
+        hexChars[0] = hexArray[v >>> 4];
+        hexChars[1] = hexArray[v & 0x0F];
+
+        return new String(hexChars);
+    }
+
+    /**
+     * InputStream to Byte array
+     * 
+     * @param input InputStream
+     * @return byte[]
+     * 
+     * @author Jeff
+     * @date 2014-10-22
+     */
+    public static byte[] toByteArray(final InputStream input) throws IOException {
+        final ByteArrayOutputStream output = new ByteArrayOutputStream();
+        copy(input, output);
+        return output.toByteArray();
+    }
+
+    private static int copy(final InputStream input, final OutputStream output) throws IOException {
+        final long count = copyLarge(input, output);
+        if (count > Integer.MAX_VALUE) {
+            return -1;
+        }
+        return (int) count;
+    }
+
+    private static long copyLarge(final InputStream input, final OutputStream output)
+            throws IOException {
+        return copy(input, output, DEFAULT_BUFFER_SIZE);
+    }
+
+    private static long copy(final InputStream input, final OutputStream output, final int bufferSize) throws IOException {
+        return copyLarge(input, output, new byte[bufferSize]);
+    }
+
+    private static long copyLarge(final InputStream input, final OutputStream output, final byte[] buffer)
+            throws IOException {
+        long count = 0;
+        int n = 0;
+        while (EOF != (n = input.read(buffer))) {
+            output.write(buffer, 0, n);
+            count += n;
+        }
+        return count;
+    }
+    
+    /**
+     * ResizedBitmap
+     * 
+     * @param bm Bitmap
+     * 
+     * @param newHeight int new size
+     * 
+     * @param newWidth int new size
+     * 
+     * @return Bitmap
+     * 
+     * @author Jeff
+     * @date 2014-10-22
+     */
+    public static Bitmap getResizedBitmap(Bitmap bm, int newWidth, int newHeight) {
+        int width = bm.getWidth();
+        int height = bm.getHeight();
+        float scaleWidth = ((float) newWidth) / width;
+        float scaleHeight = ((float) newHeight) / height;
+        Matrix matrix = new Matrix(); 
+        matrix.postScale(scaleWidth, scaleHeight);
+        Bitmap resizedBitmap = Bitmap.createBitmap(bm, 0, 0, width, height, matrix, false);
+        return resizedBitmap;
+    } 
 
 }
